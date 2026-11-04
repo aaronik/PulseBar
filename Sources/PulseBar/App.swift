@@ -105,7 +105,7 @@ private enum StatusGraph {
                     drawLine(samples.map(\.memory), in: graph, color: NSColor.systemPurple.withAlphaComponent(0.85), width: 1.25)
                 }
                 if downEnabled {
-                    drawLine(samples.map { $0.download / networkScale }, in: graph, color: NSColor.systemGreen, width: 1.35)
+                    drawLine(samples.map { $0.download / networkScale }, in: graph, color: NSColor(calibratedRed: 0.81, green: 0.91, blue: 0.23, alpha: 1), width: 1.35)
                 }
                 if upEnabled {
                     drawLine(samples.map { $0.upload / networkScale }, in: graph, color: NSColor.systemOrange, width: 1.35)

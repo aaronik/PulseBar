@@ -137,17 +137,17 @@ struct MonitorView: View {
 
     private var networkSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            sectionLabel("NETWORK", symbol: "network", color: Palette.green)
+            sectionLabel("NETWORK", symbol: "network", color: Palette.lime)
 
             HStack(alignment: .top, spacing: 0) {
-                trafficValue("DOWNLOAD", symbol: "arrow.down.right", value: snapshot.download, color: Palette.green)
+                trafficValue("DOWNLOAD", symbol: "arrow.down.right", value: snapshot.download, color: Palette.lime)
                 Spacer(minLength: 8)
                 trafficValue("UPLOAD", symbol: "arrow.up.right", value: snapshot.upload, color: Palette.orange)
             }
 
             MonitorGraph(
                 series: [graphHistory.map(\.download), graphHistory.map(\.upload)],
-                colors: [Palette.green, Palette.orange],
+                colors: [Palette.lime, Palette.orange],
                 fillFirst: false
             )
             .frame(height: 62)
@@ -193,7 +193,7 @@ struct MonitorView: View {
             }
             HStack(spacing: 8) {
                 displayToggle("Network ↑", isOn: $settings.networkUp, color: Palette.orange)
-                displayToggle("Network ↓", isOn: $settings.networkDown, color: Palette.green)
+                displayToggle("Network ↓", isOn: $settings.networkDown, color: Palette.lime)
                 Spacer(minLength: 0)
             }
             Text("Network lines share a scale set by the highest observed rate.")
@@ -338,6 +338,7 @@ private enum Palette {
     static let muted = Color(red: 0.42, green: 0.47, blue: 0.54)
     static let cyan = Color(red: 0.30, green: 0.81, blue: 0.94)
     static let green = Color(red: 0.36, green: 0.87, blue: 0.65)
+    static let lime = Color(red: 0.81, green: 0.91, blue: 0.23)
     static let purple = Color(red: 0.69, green: 0.57, blue: 0.98)
     static let orange = Color(red: 1.0, green: 0.68, blue: 0.39)
 }
