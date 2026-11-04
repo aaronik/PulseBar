@@ -11,7 +11,7 @@ PulseBar keeps CPU and memory activity in view with two live sparklines. Click t
 - **At-a-glance activity:** teal CPU and purple memory sparklines, plus a live CPU percentage.
 - **Make it yours:** toggle the CPU percentage and each CPU, memory, download (lime), and upload (orange) graph line independently in the **MENU BAR** controls. Your choices persist across launches.
 - **A meaningful scale:** CPU and memory use a subtle 0%, 50%, and 100% backdrop. Network lines share a scale set by the highest rate seen since launch; hover for exact current readings.
-- **Click for detail:** CPU history, memory usage, upload/download rates and history, and root-volume capacity.
+- **Click for detail:** CPU and memory history graphs, upload/download rates and history, and root-volume capacity.
 - **Lightweight and native:** one-second sampling, a 60-sample rolling history, an AppKit menu-bar item, and a SwiftUI popover.
 - **Private by design:** metrics are collected locally. No account, analytics, network requests, or third-party packages.
 

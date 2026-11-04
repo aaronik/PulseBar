@@ -121,7 +121,26 @@ struct MonitorView: View {
                     .monospacedDigit()
                     .foregroundStyle(Palette.primary)
             }
-            usageBar(fraction: snapshot.memory, color: Palette.purple)
+            MonitorGraph(
+                series: [graphHistory.map(\.memory)],
+                colors: [Palette.purple],
+                ceiling: 1,
+                fillFirst: true
+            )
+            .frame(height: 62)
+            .overlay(alignment: .trailing) {
+                VStack(alignment: .trailing) {
+                    Text("100%")
+                    Spacer()
+                    Text("0%")
+                }
+                .font(.system(size: 9, weight: .medium, design: .monospaced))
+                .foregroundStyle(Palette.muted)
+                .padding(.leading, 5)
+                .background(Palette.background.opacity(0.85))
+            }
+            .accessibilityLabel("Memory history, zero to one hundred percent")
+
             HStack {
                 Text("\(byteString(snapshot.usedMemory)) used")
                     .foregroundStyle(Palette.secondary)
