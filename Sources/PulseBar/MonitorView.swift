@@ -94,17 +94,17 @@ struct MonitorView: View {
                     .foregroundStyle(Palette.primary)
             }
 
-            MonitorGraph(
-                series: [graphHistory.map(\.cpu)],
-                colors: [Palette.cyan],
-                ceiling: 1,
-                fillFirst: true
-            )
-            .frame(height: 76)
-            .overlay(alignment: .trailing) {
-                verticalPercentAxis
+            HStack(spacing: 8) {
+                graphAxis(top: "100%", bottom: "0%")
+                MonitorGraph(
+                    series: [graphHistory.map(\.cpu)],
+                    colors: [Palette.cyan],
+                    ceiling: 1,
+                    fillFirst: true
+                )
+                .accessibilityLabel("CPU history, zero to one hundred percent")
             }
-            .accessibilityLabel("CPU history, zero to one hundred percent")
+            .frame(height: 76)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 17)
@@ -120,17 +120,17 @@ struct MonitorView: View {
                     .monospacedDigit()
                     .foregroundStyle(Palette.primary)
             }
-            MonitorGraph(
-                series: [graphHistory.map(\.memory)],
-                colors: [Palette.purple],
-                ceiling: 1,
-                fillFirst: true
-            )
-            .frame(height: 62)
-            .overlay(alignment: .trailing) {
-                verticalPercentAxis
+            HStack(spacing: 8) {
+                graphAxis(top: "100%", bottom: "0%")
+                MonitorGraph(
+                    series: [graphHistory.map(\.memory)],
+                    colors: [Palette.purple],
+                    ceiling: 1,
+                    fillFirst: true
+                )
+                .accessibilityLabel("Memory history, zero to one hundred percent")
             }
-            .accessibilityLabel("Memory history, zero to one hundred percent")
+            .frame(height: 62)
 
             HStack {
                 Text("\(byteString(snapshot.usedMemory)) used")
@@ -155,17 +155,17 @@ struct MonitorView: View {
                 trafficValue("UPLOAD", symbol: "arrow.up.right", value: snapshot.upload, color: Palette.orange)
             }
 
-            MonitorGraph(
-                series: [graphHistory.map(\.download), graphHistory.map(\.upload)],
-                colors: [Palette.lime, Palette.orange],
-                ceiling: networkCeiling,
-                fillFirst: false
-            )
-            .frame(height: 62)
-            .overlay(alignment: .trailing) {
+            HStack(spacing: 8) {
                 graphAxis(top: "\(byteString(networkCeiling))/s", bottom: "0 B/s")
+                MonitorGraph(
+                    series: [graphHistory.map(\.download), graphHistory.map(\.upload)],
+                    colors: [Palette.lime, Palette.orange],
+                    ceiling: networkCeiling,
+                    fillFirst: false
+                )
+                .accessibilityLabel("Network history, zero to \(byteString(networkCeiling)) per second")
             }
-            .accessibilityLabel("Network history, zero to \(byteString(networkCeiling)) per second")
+            .frame(height: 62)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 18)
@@ -268,20 +268,15 @@ struct MonitorView: View {
         .padding(.vertical, 10)
     }
 
-    private var verticalPercentAxis: some View {
-        graphAxis(top: "100%", bottom: "0%")
-    }
-
     private func graphAxis(top: String, bottom: String) -> some View {
-        VStack(alignment: .trailing) {
+        VStack(alignment: .leading) {
             Text(top)
             Spacer()
             Text(bottom)
         }
         .font(.system(size: 9, weight: .medium, design: .monospaced))
         .foregroundStyle(Palette.muted)
-        .padding(.leading, 5)
-        .background(Palette.background.opacity(0.85))
+        .fixedSize(horizontal: true, vertical: false)
     }
 
     private var separator: some View {
