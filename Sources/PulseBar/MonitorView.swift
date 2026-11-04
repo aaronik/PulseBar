@@ -95,17 +95,10 @@ struct MonitorView: View {
                 fillFirst: true
             )
             .frame(height: 76)
-
-            HStack {
-                Text("0%")
-                Spacer()
-                Text("RECENT ACTIVITY")
-                    .tracking(1)
-                Spacer()
-                Text("100%")
+            .overlay(alignment: .trailing) {
+                verticalPercentAxis
             }
-            .font(.system(size: 9, weight: .medium, design: .monospaced))
-            .foregroundStyle(Palette.muted)
+            .accessibilityLabel("CPU history, zero to one hundred percent")
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 17)
@@ -129,15 +122,7 @@ struct MonitorView: View {
             )
             .frame(height: 62)
             .overlay(alignment: .trailing) {
-                VStack(alignment: .trailing) {
-                    Text("100%")
-                    Spacer()
-                    Text("0%")
-                }
-                .font(.system(size: 9, weight: .medium, design: .monospaced))
-                .foregroundStyle(Palette.muted)
-                .padding(.leading, 5)
-                .background(Palette.background.opacity(0.85))
+                verticalPercentAxis
             }
             .accessibilityLabel("Memory history, zero to one hundred percent")
 
@@ -270,6 +255,18 @@ struct MonitorView: View {
         .padding(.leading, 20)
         .padding(.trailing, 12)
         .padding(.vertical, 10)
+    }
+
+    private var verticalPercentAxis: some View {
+        VStack(alignment: .trailing) {
+            Text("100%")
+            Spacer()
+            Text("0%")
+        }
+        .font(.system(size: 9, weight: .medium, design: .monospaced))
+        .foregroundStyle(Palette.muted)
+        .padding(.leading, 5)
+        .background(Palette.background.opacity(0.85))
     }
 
     private var separator: some View {
