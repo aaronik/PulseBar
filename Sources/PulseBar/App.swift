@@ -6,9 +6,11 @@ import SwiftUI
 @MainActor
 final class PulseBarApp: NSObject, NSApplicationDelegate {
     private let store = MonitorStore()
+    private let settings = DisplaySettings()
     private var statusItem: NSStatusItem?
     private let popover = NSPopover()
-    private var subscription: AnyCancellable?
+    private var subscriptions = Set<AnyCancellable>()
+    private var peakNetworkRate: Double = 0
 
     static func main() {
         let app = NSApplication.shared
@@ -30,18 +32,29 @@ final class PulseBarApp: NSObject, NSApplicationDelegate {
         popover.behavior = .transient
         popover.animates = true
         popover.contentSize = NSSize(width: 360, height: 590)
-        popover.contentViewController = NSHostingController(rootView: MonitorView(store: store))
+        popover.contentViewController = NSHostingController(rootView: MonitorView(store: store, settings: settings))
 
-        subscription = store.$history.sink { [weak self] history in
+        store.$history.dropFirst().sink { [weak self] history in
             guard let self else { return }
+            if let last = history.last {
+                self.peakNetworkRate = max(self.peakNetworkRate, last.upload, last.download)
+            }
             self.renderStatus(history)
-        }
+        }.store(in: &subscriptions)
+        settings.objectWillChange.sink { [weak self] _ in
+            // @Published emits before changing its property; render on the next main-loop turn.
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.renderStatus(self.store.history)
+            }
+        }.store(in: &subscriptions)
+        renderStatus([])
         store.start()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         store.stop()
-        subscription?.cancel()
+        subscriptions.removeAll()
         if let statusItem { NSStatusBar.system.removeStatusItem(statusItem) }
     }
 
@@ -55,34 +68,63 @@ final class PulseBarApp: NSObject, NSApplicationDelegate {
     }
 
     private func renderStatus(_ history: [MetricSnapshot]) {
-        guard let button = statusItem?.button else { return }
+        guard let item = statusItem, let button = item.button else { return }
         let cpu = history.last?.cpu ?? 0
         let memory = history.last?.memory ?? 0
+        let upload = history.last?.upload ?? 0
+        let download = history.last?.download ?? 0
+        let hasGraph = settings.showsUsageGraph || settings.showsNetworkGraph
+        // Keep a clickable icon even when every metric is switched off.
+        let width: CGFloat = (hasGraph ? 58 : 18) + (settings.cpuPercent ? 37 : 0)
+        item.length = width
         button.imagePosition = .imageOnly
-        button.image = StatusGraph.image(cpu: history.map(\.cpu), memory: history.map(\.memory), label: Int((cpu * 100).rounded()))
-        button.toolTip = "CPU \(Int((cpu * 100).rounded()))% · Memory \(Int((memory * 100).rounded()))% (graph: 0–100%)"
-        button.setAccessibilityValue("CPU \(Int((cpu * 100).rounded())) percent, memory \(Int((memory * 100).rounded())) percent")
+        button.image = StatusGraph.image(history: history, settings: settings, peakNetworkRate: peakNetworkRate)
+        button.toolTip = "CPU \(Int((cpu * 100).rounded()))% · Memory \(Int((memory * 100).rounded()))% · ↓ \(Int(download)) B/s · ↑ \(Int(upload)) B/s"
+        button.setAccessibilityValue("CPU \(Int((cpu * 100).rounded())) percent, memory \(Int((memory * 100).rounded())) percent, download \(Int(download)) bytes per second, upload \(Int(upload)) bytes per second")
     }
 }
 
+@MainActor
 private enum StatusGraph {
-    static func image(cpu: [Double], memory: [Double], label: Int) -> NSImage {
-        let size = NSSize(width: 91, height: 20)
-        let recentCPU = Array(cpu.suffix(30))
-        let recentMemory = Array(memory.suffix(30))
-        return NSImage(size: size, flipped: false) { rect in
-            let fg = NSColor.labelColor
-            let accent = NSColor.systemTeal
-            let secondary = NSColor.systemPurple.withAlphaComponent(0.85)
-            let graph = CGRect(x: 1, y: 3, width: 53, height: 14)
-            drawBackdrop(in: graph)
-            drawLine(recentMemory, in: graph, color: secondary, width: 1.25)
-            drawLine(recentCPU, in: graph, color: accent, width: 1.6)
-            let text = "\(label)%" as NSString
-            text.draw(in: CGRect(x: 58, y: 1, width: 34, height: 17), withAttributes: [
-                .font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .semibold),
-                .foregroundColor: fg
-            ])
+    static func image(history: [MetricSnapshot], settings: DisplaySettings, peakNetworkRate: Double) -> NSImage {
+        let samples = Array(history.suffix(30))
+        let hasGraph = settings.showsUsageGraph || settings.showsNetworkGraph
+        let size = NSSize(width: (hasGraph ? 54 : 14) + (settings.cpuPercent ? 37 : 0), height: 20)
+        let label = Int(((samples.last?.cpu ?? 0) * 100).rounded())
+        let cpuEnabled = settings.cpuGraph
+        let memoryEnabled = settings.memoryGraph
+        let upEnabled = settings.networkUp
+        let downEnabled = settings.networkDown
+        let percentEnabled = settings.cpuPercent
+        let networkScale = max(peakNetworkRate, 1)
+        return NSImage(size: size, flipped: false) { _ in
+            if hasGraph {
+                let graph = CGRect(x: 1, y: 3, width: 53, height: 14)
+                drawBackdrop(in: graph)
+                if memoryEnabled {
+                    drawLine(samples.map(\.memory), in: graph, color: NSColor.systemPurple.withAlphaComponent(0.85), width: 1.25)
+                }
+                if downEnabled {
+                    drawLine(samples.map { $0.download / networkScale }, in: graph, color: NSColor.systemGreen, width: 1.35)
+                }
+                if upEnabled {
+                    drawLine(samples.map { $0.upload / networkScale }, in: graph, color: NSColor.systemOrange, width: 1.35)
+                }
+                if cpuEnabled {
+                    drawLine(samples.map(\.cpu), in: graph, color: NSColor.systemTeal, width: 1.6)
+                }
+            } else if !percentEnabled {
+                // Never strand the user with an invisible, unclickable status item.
+                let icon = NSImage(systemSymbolName: "waveform.path.ecg", accessibilityDescription: "PulseBar")
+                icon?.draw(in: CGRect(x: 0, y: 2, width: 14, height: 15))
+            }
+            if percentEnabled {
+                let text = "\(label)%" as NSString
+                text.draw(in: CGRect(x: hasGraph ? 58 : 2, y: 1, width: 34, height: 17), withAttributes: [
+                    .font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .semibold),
+                    .foregroundColor: NSColor.labelColor
+                ])
+            }
             return true
         }
     }

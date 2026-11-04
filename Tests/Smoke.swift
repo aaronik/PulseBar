@@ -21,6 +21,23 @@ struct Smoke {
         let count = store.history.count
         try await Task.sleep(for: .seconds(1.2))
         precondition(store.history.count == count, "Timer continued after stop")
-        print("PASS: \(count) live samples; CPU \(Int(sample.cpu * 100))%, RAM \(Int(sample.memory * 100))%, network \(Int(sample.download)) down / \(Int(sample.upload)) up B/s")
+
+        let suite = "PulseBar.Smoke.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = DisplaySettings(defaults: defaults)
+        precondition(settings.cpuPercent && settings.cpuGraph && settings.memoryGraph)
+        precondition(!settings.networkUp && !settings.networkDown)
+        settings.cpuPercent = false
+        settings.cpuGraph = false
+        settings.memoryGraph = false
+        settings.networkUp = true
+        precondition(!settings.showsUsageGraph && settings.showsNetworkGraph)
+        let restored = DisplaySettings(defaults: defaults)
+        precondition(!restored.cpuPercent && !restored.cpuGraph && !restored.memoryGraph)
+        precondition(restored.networkUp && !restored.networkDown, "Preferences did not persist independently")
+        restored.networkDown = true
+        precondition(restored.networkUp && restored.networkDown)
+        print("PASS: \(count) live samples, independent persistent toggles; CPU \(Int(sample.cpu * 100))%, RAM \(Int(sample.memory * 100))%")
     }
 }

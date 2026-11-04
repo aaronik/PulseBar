@@ -3,6 +3,7 @@ import SwiftUI
 
 struct MonitorView: View {
     @ObservedObject var store: MonitorStore
+    @ObservedObject var settings: DisplaySettings
 
     private var snapshot: MetricSnapshot { store.snapshot }
 
@@ -22,6 +23,8 @@ struct MonitorView: View {
             networkSection
             separator
             diskSection
+            separator
+            displaySection
             separator
             footer
         }
@@ -178,6 +181,47 @@ struct MonitorView: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 18)
+    }
+
+    private var displaySection: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            sectionLabel("MENU BAR", symbol: "slider.horizontal.3", color: Palette.cyan)
+            HStack(spacing: 8) {
+                displayToggle("CPU %", isOn: $settings.cpuPercent, color: Palette.primary)
+                displayToggle("Memory", isOn: $settings.memoryGraph, color: Palette.purple)
+                displayToggle("CPU", isOn: $settings.cpuGraph, color: Palette.cyan)
+            }
+            HStack(spacing: 8) {
+                displayToggle("Network ↑", isOn: $settings.networkUp, color: Palette.orange)
+                displayToggle("Network ↓", isOn: $settings.networkDown, color: Palette.green)
+                Spacer(minLength: 0)
+            }
+            Text("Network lines share a scale set by the highest observed rate.")
+                .font(.system(size: 10))
+                .foregroundStyle(Palette.muted)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+    }
+
+    private func displayToggle(_ title: String, isOn: Binding<Bool>, color: Color) -> some View {
+        Toggle(isOn: isOn) {
+            HStack(spacing: 5) {
+                Circle().fill(color).frame(width: 6, height: 6)
+                Text(title).lineLimit(1)
+            }
+            .font(.system(size: 11, weight: .medium))
+        }
+        .toggleStyle(.button)
+        .buttonStyle(.plain)
+        .foregroundStyle(isOn.wrappedValue ? Palette.primary : Palette.secondary)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(isOn.wrappedValue ? color.opacity(0.16) : Palette.track, in: Capsule())
+        .overlay(Capsule().strokeBorder(isOn.wrappedValue ? color.opacity(0.45) : Palette.border))
+        .accessibilityLabel(title)
+        .accessibilityValue(isOn.wrappedValue ? "On" : "Off")
+        .help("Show \(title) in the menu bar")
     }
 
     private var footer: some View {
