@@ -12,6 +12,12 @@ struct MonitorView: View {
         return recent.last?.timestamp == snapshot.timestamp ? recent : recent + [snapshot]
     }
 
+    // Use the exact same ceiling for the network graph and its vertical axis.
+    private var networkCeiling: Double {
+        let peak = graphHistory.reduce(0.0) { max($0, $1.download, $1.upload) }
+        return max(peak * 1.15, 1)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -152,9 +158,14 @@ struct MonitorView: View {
             MonitorGraph(
                 series: [graphHistory.map(\.download), graphHistory.map(\.upload)],
                 colors: [Palette.lime, Palette.orange],
+                ceiling: networkCeiling,
                 fillFirst: false
             )
             .frame(height: 62)
+            .overlay(alignment: .trailing) {
+                graphAxis(top: "\(byteString(networkCeiling))/s", bottom: "0 B/s")
+            }
+            .accessibilityLabel("Network history, zero to \(byteString(networkCeiling)) per second")
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 18)
@@ -258,10 +269,14 @@ struct MonitorView: View {
     }
 
     private var verticalPercentAxis: some View {
+        graphAxis(top: "100%", bottom: "0%")
+    }
+
+    private func graphAxis(top: String, bottom: String) -> some View {
         VStack(alignment: .trailing) {
-            Text("100%")
+            Text(top)
             Spacer()
-            Text("0%")
+            Text(bottom)
         }
         .font(.system(size: 9, weight: .medium, design: .monospaced))
         .foregroundStyle(Palette.muted)
