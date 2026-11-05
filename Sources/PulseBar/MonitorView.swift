@@ -12,6 +12,19 @@ struct MonitorView: View {
         return recent.last?.timestamp == snapshot.timestamp ? recent : recent + [snapshot]
     }
 
+    // Battery uses a fixed two-day window rather than the short metric history.
+    private var batteryChartEnd: Date {
+        snapshot.timestamp == .distantPast ? Date() : snapshot.timestamp
+    }
+
+    private var batteryChartStart: Date {
+        batteryChartEnd.addingTimeInterval(-BatteryHistory.window)
+    }
+
+    private var batteryPoints: [BatteryPoint] {
+        store.batteryHistory.filter { $0.timestamp >= batteryChartStart && $0.timestamp <= batteryChartEnd }
+    }
+
     // Use the exact same ceiling for the network graph and its vertical axis.
     private var networkCeiling: Double {
         let peak = graphHistory.reduce(0.0) { max($0, $1.download, $1.upload) }
@@ -211,16 +224,19 @@ struct MonitorView: View {
             HStack(spacing: 8) {
                 graphAxis(top: "100%", bottom: "0%")
                 MonitorGraph(
-                    series: [graphHistory.compactMap { $0.battery?.level }],
-                    timestamps: graphHistory.compactMap { $0.battery == nil ? nil : $0.timestamp },
+                    series: [batteryPoints.map(\.level)],
+                    timestamps: batteryPoints.map(\.timestamp),
                     colors: [batteryColor],
                     ceiling: 1,
-                    fillFirst: true
+                    fillFirst: true,
+                    timeRange: batteryChartStart...batteryChartEnd,
+                    maxPoints: BatteryHistory.maximumPoints,
+                    gapThreshold: BatteryHistory.sampleInterval * 3
                 )
-                .accessibilityLabel("Battery charge history, zero to one hundred percent")
+                .accessibilityLabel("Battery charge history, past 48 hours, zero to one hundred percent")
             }
             .frame(height: 62)
-            graphTimeAxis(samples: graphHistory.filter { $0.battery != nil }, scaleLabel: "100%")
+            batteryTimeAxis
             HStack(spacing: 6) {
                 Image(systemName: battery?.isCharging == true ? "bolt.fill" :
                       battery?.isPluggedIn == true ? "powerplug.fill" : "battery.100percent")
@@ -407,6 +423,24 @@ struct MonitorView: View {
         .background(Palette.track.opacity(0.65), in: RoundedRectangle(cornerRadius: 10))
     }
 
+    private var batteryTimeAxis: some View {
+        HStack(spacing: 8) {
+            Text("100%")
+                .hidden()
+                .fixedSize(horizontal: true, vertical: false)
+            HStack {
+                Text("48H AGO")
+                Spacer()
+                Text("24H")
+                Spacer()
+                Text("NOW")
+            }
+        }
+        .font(.system(size: 9, weight: .medium, design: .monospaced))
+        .foregroundStyle(Palette.muted)
+        .accessibilityLabel("Battery history from 48 hours ago to now")
+    }
+
     private func graphTimeAxis(samples: [MetricSnapshot], scaleLabel: String) -> some View {
         HStack(spacing: 8) {
             Text(scaleLabel)
@@ -531,6 +565,9 @@ private struct MonitorGraph: View {
     let colors: [Color]
     var ceiling: Double? = nil
     var fillFirst = false
+    var timeRange: ClosedRange<Date>? = nil
+    var maxPoints = 48
+    var gapThreshold: TimeInterval? = nil
 
     var body: some View {
         Canvas { context, size in
@@ -550,39 +587,49 @@ private struct MonitorGraph: View {
             let scale = max(ceiling ?? (highest * 1.15), 1e-9)
 
             for (index, samples) in series.enumerated() where index < colors.count {
-                let values = Array(samples.suffix(48))
+                let values = Array(samples.suffix(maxPoints))
                 guard !values.isEmpty else { continue }
                 let times = Array(timestamps.suffix(values.count))
-                let span = (times.count == values.count && times.count > 1)
-                    ? times[times.count - 1].timeIntervalSince(times[0]) : 0
+                let start = timeRange?.lowerBound ?? times.first ?? .distantPast
+                let end = timeRange?.upperBound ?? times.last ?? .distantPast
+                let span = end.timeIntervalSince(start)
                 let points = values.enumerated().map { offset, value in
-                    let progress = span > 0
-                        ? times[offset].timeIntervalSince(times[0]) / span
+                    let progress = times.count == values.count && span > 0
+                        ? times[offset].timeIntervalSince(start) / span
                         : Double(offset) / Double(max(values.count - 1, 1))
                     return CGPoint(
                         x: size.width * CGFloat(min(1, max(0, progress))),
                         y: inset + height * (1 - CGFloat(min(max(value.isFinite ? value : 0, 0) / scale, 1)))
                     )
                 }
-                var line = Path()
-                line.move(to: points[0])
-                for point in points.dropFirst() { line.addLine(to: point) }
-                if points.count == 1 {
-                    line.addLine(to: CGPoint(x: size.width, y: points[0].y))
+                var segmentStart = 0
+                for boundary in 1...points.count {
+                    let isGap = boundary < points.count && gapThreshold.map { threshold in
+                        times.count == values.count && times[boundary].timeIntervalSince(times[boundary - 1]) > threshold
+                    } == true
+                    guard isGap || boundary == points.count else { continue }
+                    let segment = Array(points[segmentStart..<boundary])
+                    segmentStart = boundary
+                    guard let first = segment.first, let last = segment.last else { continue }
+                    var line = Path()
+                    line.move(to: first)
+                    for point in segment.dropFirst() { line.addLine(to: point) }
+                    if segment.count == 1 && timeRange == nil {
+                        line.addLine(to: CGPoint(x: size.width, y: first.y))
+                    }
+                    if fillFirst && index == 0 && segment.count > 1 {
+                        var area = line
+                        area.addLine(to: CGPoint(x: last.x, y: size.height))
+                        area.addLine(to: CGPoint(x: first.x, y: size.height))
+                        area.closeSubpath()
+                        context.fill(area, with: .linearGradient(
+                            Gradient(colors: [colors[index].opacity(0.28), colors[index].opacity(0.01)]),
+                            startPoint: .zero,
+                            endPoint: CGPoint(x: 0, y: size.height)
+                        ))
+                    }
+                    context.stroke(line, with: .color(colors[index]), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
                 }
-
-                if fillFirst && index == 0 {
-                    var area = line
-                    area.addLine(to: CGPoint(x: size.width, y: size.height))
-                    area.addLine(to: CGPoint(x: points[0].x, y: size.height))
-                    area.closeSubpath()
-                    context.fill(area, with: .linearGradient(
-                        Gradient(colors: [colors[index].opacity(0.28), colors[index].opacity(0.01)]),
-                        startPoint: .zero,
-                        endPoint: CGPoint(x: 0, y: size.height)
-                    ))
-                }
-                context.stroke(line, with: .color(colors[index]), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
                 if let last = points.last {
                     context.fill(Path(ellipseIn: CGRect(x: last.x - 3, y: last.y - 3, width: 6, height: 6)), with: .color(colors[index]))
                 }

@@ -32,9 +32,13 @@ struct MetricSnapshot: Sendable {
 final class MonitorStore: ObservableObject {
     @Published var snapshot: MetricSnapshot = .zero
     @Published var history: [MetricSnapshot] = []
+    @Published private(set) var batteryHistory: [BatteryPoint] = []
     @Published var topCPUProcesses: [ProcessUsage] = []
     @Published var topMemoryProcesses: [ProcessUsage] = []
 
+    private let batteryRecorder: BatteryHistory
+    private var lastSystemBatteryRefresh: Date = .distantPast
+    private var usingSystemBatteryHistory = false
     private let processSampler = ProcessSampler()
     private var processTask: Task<Void, Never>?
     private var processGeneration = 0
@@ -44,7 +48,16 @@ final class MonitorStore: ObservableObject {
     private var previousNetwork: [String: InterfaceCounters]?
     private var previousNetworkTime: Date?
 
-    init() {}
+    init(batteryHistoryURL: URL? = nil) {
+        batteryRecorder = BatteryHistory(url: batteryHistoryURL)
+        if batteryHistoryURL == nil, let system = SystemBatteryHistory.read(), !system.isEmpty {
+            batteryHistory = system
+            usingSystemBatteryHistory = true
+            lastSystemBatteryRefresh = Date()
+        } else {
+            batteryHistory = batteryRecorder.points
+        }
+    }
 
     func start() {
         guard timer == nil else { return }
@@ -113,6 +126,21 @@ final class MonitorStore: ObservableObject {
         let (download, upload) = networkRates(at: now)
         let (diskUsed, diskTotal) = diskUsage() ?? (snapshot.diskUsed, snapshot.diskTotal)
         let battery = BatterySampler.read()
+        if let battery {
+            _ = batteryRecorder.record(battery, at: now)
+            if now.timeIntervalSince(lastSystemBatteryRefresh) >= BatteryHistory.sampleInterval {
+                lastSystemBatteryRefresh = now
+                if let system = SystemBatteryHistory.read(now: now), !system.isEmpty {
+                    batteryHistory = system
+                    usingSystemBatteryHistory = true
+                } else {
+                    usingSystemBatteryHistory = false
+                }
+            }
+            if !usingSystemBatteryHistory {
+                batteryHistory = batteryRecorder.points
+            }
+        }
 
         let current = MetricSnapshot(
             timestamp: now,

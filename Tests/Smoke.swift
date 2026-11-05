@@ -19,6 +19,7 @@ struct Smoke {
         precondition(sample.upload.isFinite && sample.upload >= 0, "Invalid upload")
         if let battery = BatterySampler.read() {
             precondition((0...1).contains(battery.level), "Invalid battery percentage")
+            precondition(!store.batteryHistory.isEmpty, "No battery history recorded")
             precondition(sample.battery != nil, "Battery missing from metric history")
             precondition(abs((sample.battery?.level ?? 0) - battery.level) <= 0.05,
                          "Battery history differs from power source")
@@ -49,6 +50,31 @@ struct Smoke {
         precondition(GraphTimeline.label(for: Array(timeline.prefix(13))) == "1m ago")
         precondition(GraphTimeline.label(for: timeline) == "3m 55s ago",
                      "Time axis must use the 48 samples actually plotted")
+
+        if let systemHistory = SystemBatteryHistory.read() {
+            precondition(systemHistory.count <= 600, "System battery history exceeded chart capacity")
+            precondition(systemHistory.allSatisfy { (0...1).contains($0.level) }, "Invalid system battery level")
+            precondition(zip(systemHistory, systemHistory.dropFirst()).allSatisfy {
+                $0.timestamp <= $1.timestamp
+            }, "System battery history is out of order")
+        }
+        precondition(SystemBatteryHistory.read(path: "/not/a/powerlog.db") == nil,
+                     "Inaccessible system history should fall back safely")
+
+        let historyURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("PulseBar-Smoke-\(UUID().uuidString)/battery-history.json")
+        defer { try? FileManager.default.removeItem(at: historyURL.deletingLastPathComponent()) }
+        let recorder = BatteryHistory(url: historyURL, now: base)
+        let reading = BatteryReading(level: 0.65, isCharging: false, isPluggedIn: false)
+        precondition(recorder.record(reading, at: base))
+        precondition(!recorder.record(reading, at: base.addingTimeInterval(60)), "Battery sampled too often")
+        precondition(recorder.record(reading, at: base.addingTimeInterval(300)))
+        precondition(recorder.record(BatteryReading(level: 0.66, isCharging: true, isPluggedIn: true),
+                                    at: base.addingTimeInterval(301)), "Charging transition not captured")
+        let loaded = BatteryHistory(url: historyURL, now: base.addingTimeInterval(301))
+        precondition(loaded.points.count == 3, "Battery history did not survive reload")
+        let expired = BatteryHistory(url: historyURL, now: base.addingTimeInterval(BatteryHistory.window + 302))
+        precondition(expired.points.isEmpty, "Old battery readings were not pruned")
 
         let sampler = ProcessSampler()
         _ = await sampler.sample()
