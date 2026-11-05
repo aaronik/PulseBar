@@ -23,6 +23,14 @@ struct Smoke {
             precondition(sample.battery != nil, "Battery missing from metric history")
             precondition(abs((sample.battery?.level ?? 0) - battery.level) <= 0.05,
                          "Battery history differs from power source")
+            if let power = sample.power {
+                for watts in [power.adapterRatingWatts, power.inputWatts, power.systemWatts, power.batteryWatts].compactMap({ $0 }) {
+                    precondition(watts.isFinite && abs(watts) < 1_000, "Invalid power reading")
+                }
+                if !battery.isPluggedIn {
+                    precondition(power.adapterRatingWatts == nil, "Adapter rating shown while unplugged")
+                }
+            }
         } else {
             precondition(sample.battery == nil, "No-battery machine should omit battery reading")
         }

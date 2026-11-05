@@ -45,6 +45,10 @@ struct MonitorView: View {
                     if snapshot.battery != nil {
                         separator
                         batterySection
+                        if snapshot.power != nil {
+                            separator
+                            powerSection
+                        }
                     }
                     separator
                     diskSection
@@ -253,6 +257,64 @@ struct MonitorView: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 18)
+    }
+
+    private var powerSection: some View {
+        let power = snapshot.power
+        let batteryWatts = power?.batteryWatts
+        let batteryColor = batteryWatts.map { $0 < -0.5 ? Palette.orange : Palette.battery } ?? Palette.muted
+
+        return VStack(alignment: .leading, spacing: 13) {
+            HStack {
+                sectionLabel("POWER FLOW", symbol: "bolt.circle", color: Palette.battery)
+                Spacer()
+                Text("APPROXIMATE")
+                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                    .tracking(1)
+                    .foregroundStyle(Palette.muted)
+            }
+            HStack(spacing: 8) {
+                powerTile("ADAPTER MAX", value: power?.adapterRatingWatts, color: Palette.secondary)
+                powerTile("INPUT", value: power?.inputWatts, color: Palette.lime)
+                powerTile("SYSTEM", value: power?.systemWatts, color: Palette.cyan)
+            }
+            HStack(spacing: 7) {
+                Image(systemName: batteryWatts.map { $0 < -0.5 ? "battery.100percent" : "bolt.fill" } ?? "battery.100percent")
+                    .foregroundStyle(batteryColor)
+                Text(batteryWatts.map { $0 < -0.5 ? "Battery draining" : $0 > 0.5 ? "Battery charging" : "Battery idle" } ?? "Battery flow unavailable")
+                    .foregroundStyle(Palette.secondary)
+                Spacer()
+                Text(batteryWatts.map { String(format: "%+.1f W", $0) } ?? "—")
+                    .monospacedDigit()
+                    .foregroundStyle(batteryColor)
+            }
+            .font(.system(size: 11, weight: .semibold))
+            Text("Adapter max is its rating, not live draw. Battery + charges / − drains.")
+                .font(.system(size: 10))
+                .foregroundStyle(Palette.muted)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 18)
+    }
+
+    private func powerTile(_ title: String, value: Double?, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.system(size: 9, weight: .bold, design: .rounded))
+                .tracking(0.5)
+                .foregroundStyle(Palette.muted)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            Text(value.map { String(format: "%.1f W", $0) } ?? "—")
+                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(9)
+        .background(Palette.track.opacity(0.65), in: RoundedRectangle(cornerRadius: 9))
     }
 
     private var diskSection: some View {
