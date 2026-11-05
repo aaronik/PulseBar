@@ -38,6 +38,18 @@ struct Smoke {
         try await Task.sleep(for: .seconds(1.2))
         precondition(store.history.count == count, "Timer continued after stop")
 
+        let base = Date(timeIntervalSince1970: 1000)
+        let timeline = (0..<60).map { index -> MetricSnapshot in
+            var point = MetricSnapshot.zero
+            point.timestamp = base.addingTimeInterval(Double(index * 5))
+            return point
+        }
+        precondition(GraphTimeline.label(for: []) == "0s ago")
+        precondition(GraphTimeline.label(for: [timeline[0]]) == "0s ago")
+        precondition(GraphTimeline.label(for: Array(timeline.prefix(13))) == "1m ago")
+        precondition(GraphTimeline.label(for: timeline) == "3m 55s ago",
+                     "Time axis must use the 48 samples actually plotted")
+
         let sampler = ProcessSampler()
         _ = await sampler.sample()
         try await Task.sleep(for: .seconds(1.2))

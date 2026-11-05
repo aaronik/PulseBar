@@ -109,6 +109,7 @@ struct MonitorView: View {
                 graphAxis(top: "100%", bottom: "0%")
                 MonitorGraph(
                     series: [graphHistory.map(\.cpu)],
+                    timestamps: graphHistory.map(\.timestamp),
                     colors: [Palette.cyan],
                     ceiling: 1,
                     fillFirst: true
@@ -116,6 +117,7 @@ struct MonitorView: View {
                 .accessibilityLabel("CPU history, zero to one hundred percent")
             }
             .frame(height: 76)
+            graphTimeAxis(samples: graphHistory, scaleLabel: "100%")
 
             processList("TOP CPU PROCESSES", processes: store.topCPUProcesses, color: Palette.cyan) {
                 String(format: "%.1f%%", $0.cpu)
@@ -139,6 +141,7 @@ struct MonitorView: View {
                 graphAxis(top: "100%", bottom: "0%")
                 MonitorGraph(
                     series: [graphHistory.map(\.memory)],
+                    timestamps: graphHistory.map(\.timestamp),
                     colors: [Palette.purple],
                     ceiling: 1,
                     fillFirst: true
@@ -146,6 +149,7 @@ struct MonitorView: View {
                 .accessibilityLabel("Memory history, zero to one hundred percent")
             }
             .frame(height: 62)
+            graphTimeAxis(samples: graphHistory, scaleLabel: "100%")
 
             HStack {
                 Text("\(byteString(snapshot.usedMemory)) used")
@@ -178,6 +182,7 @@ struct MonitorView: View {
                 graphAxis(top: "\(byteString(networkCeiling))/s", bottom: "0 B/s")
                 MonitorGraph(
                     series: [graphHistory.map(\.download), graphHistory.map(\.upload)],
+                    timestamps: graphHistory.map(\.timestamp),
                     colors: [Palette.lime, Palette.orange],
                     ceiling: networkCeiling,
                     fillFirst: false
@@ -185,6 +190,7 @@ struct MonitorView: View {
                 .accessibilityLabel("Network history, zero to \(byteString(networkCeiling)) per second")
             }
             .frame(height: 62)
+            graphTimeAxis(samples: graphHistory, scaleLabel: "\(byteString(networkCeiling))/s")
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 18)
@@ -206,6 +212,7 @@ struct MonitorView: View {
                 graphAxis(top: "100%", bottom: "0%")
                 MonitorGraph(
                     series: [graphHistory.compactMap { $0.battery?.level }],
+                    timestamps: graphHistory.compactMap { $0.battery == nil ? nil : $0.timestamp },
                     colors: [batteryColor],
                     ceiling: 1,
                     fillFirst: true
@@ -213,6 +220,7 @@ struct MonitorView: View {
                 .accessibilityLabel("Battery charge history, zero to one hundred percent")
             }
             .frame(height: 62)
+            graphTimeAxis(samples: graphHistory.filter { $0.battery != nil }, scaleLabel: "100%")
             HStack(spacing: 6) {
                 Image(systemName: battery?.isCharging == true ? "bolt.fill" :
                       battery?.isPluggedIn == true ? "powerplug.fill" : "battery.100percent")
@@ -399,6 +407,22 @@ struct MonitorView: View {
         .background(Palette.track.opacity(0.65), in: RoundedRectangle(cornerRadius: 10))
     }
 
+    private func graphTimeAxis(samples: [MetricSnapshot], scaleLabel: String) -> some View {
+        HStack(spacing: 8) {
+            Text(scaleLabel)
+                .hidden()
+                .fixedSize(horizontal: true, vertical: false)
+            HStack {
+                Text(GraphTimeline.label(for: samples))
+                Spacer()
+                Text("NOW")
+            }
+        }
+        .font(.system(size: 9, weight: .medium, design: .monospaced))
+        .foregroundStyle(Palette.muted)
+        .accessibilityLabel("History from \(GraphTimeline.label(for: samples)) to now")
+    }
+
     private func graphAxis(top: String, bottom: String) -> some View {
         VStack(alignment: .leading) {
             Text(top)
@@ -503,6 +527,7 @@ private enum Palette {
 
 private struct MonitorGraph: View {
     let series: [[Double]]
+    let timestamps: [Date]
     let colors: [Color]
     var ceiling: Double? = nil
     var fillFirst = false
@@ -527,9 +552,15 @@ private struct MonitorGraph: View {
             for (index, samples) in series.enumerated() where index < colors.count {
                 let values = Array(samples.suffix(48))
                 guard !values.isEmpty else { continue }
+                let times = Array(timestamps.suffix(values.count))
+                let span = (times.count == values.count && times.count > 1)
+                    ? times[times.count - 1].timeIntervalSince(times[0]) : 0
                 let points = values.enumerated().map { offset, value in
-                    CGPoint(
-                        x: size.width * CGFloat(offset) / CGFloat(max(values.count - 1, 1)),
+                    let progress = span > 0
+                        ? times[offset].timeIntervalSince(times[0]) / span
+                        : Double(offset) / Double(max(values.count - 1, 1))
+                    return CGPoint(
+                        x: size.width * CGFloat(min(1, max(0, progress))),
                         y: inset + height * (1 - CGFloat(min(max(value.isFinite ? value : 0, 0) / scale, 1)))
                     )
                 }
