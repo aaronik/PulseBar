@@ -30,7 +30,12 @@ struct MetricSnapshot: Sendable {
 final class MonitorStore: ObservableObject {
     @Published var snapshot: MetricSnapshot = .zero
     @Published var history: [MetricSnapshot] = []
+    @Published var topCPUProcesses: [ProcessUsage] = []
+    @Published var topMemoryProcesses: [ProcessUsage] = []
 
+    private let processSampler = ProcessSampler()
+    private var processTask: Task<Void, Never>?
+    private var processGeneration = 0
     private var timer: Timer?
     private var previousCPU: [UInt64]?
     private var previousNetwork: [String: InterfaceCounters]?
@@ -51,11 +56,34 @@ final class MonitorStore: ObservableObject {
     }
 
     func stop() {
+        stopProcessSampling()
         timer?.invalidate()
         timer = nil
         previousCPU = nil
         previousNetwork = nil
         previousNetworkTime = nil
+    }
+
+    func startProcessSampling() {
+        guard processTask == nil else { return }
+        processGeneration += 1
+        let generation = processGeneration
+        processTask = Task { [weak self] in
+            guard let self else { return }
+            while !Task.isCancelled {
+                let result = await processSampler.sample()
+                guard !Task.isCancelled, generation == processGeneration else { break }
+                topCPUProcesses = result.cpu
+                topMemoryProcesses = result.memory
+                try? await Task.sleep(for: .seconds(3))
+            }
+        }
+    }
+
+    func stopProcessSampling() {
+        processGeneration += 1
+        processTask?.cancel()
+        processTask = nil
     }
 
     private func poll() {

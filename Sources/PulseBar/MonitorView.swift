@@ -22,19 +22,24 @@ struct MonitorView: View {
         VStack(spacing: 0) {
             header
             separator
-            cpuSection
-            separator
-            memorySection
-            separator
-            networkSection
-            separator
-            diskSection
-            separator
-            displaySection
+            ScrollView {
+                VStack(spacing: 0) {
+                    cpuSection
+                    separator
+                    memorySection
+                    separator
+                    networkSection
+                    separator
+                    diskSection
+                    separator
+                    displaySection
+                }
+            }
+            .scrollIndicators(.visible)
             separator
             footer
         }
-        .frame(width: 360)
+        .frame(width: 360, height: 920)
         .background(Palette.background, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -105,6 +110,10 @@ struct MonitorView: View {
                 .accessibilityLabel("CPU history, zero to one hundred percent")
             }
             .frame(height: 76)
+
+            processList("TOP CPU PROCESSES", processes: store.topCPUProcesses, color: Palette.cyan) {
+                String(format: "%.1f%%", $0.cpu)
+            }
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 17)
@@ -140,6 +149,10 @@ struct MonitorView: View {
                     .foregroundStyle(Palette.muted)
             }
             .font(.system(size: 11, weight: .medium, design: .monospaced))
+
+            processList("TOP MEMORY PROCESSES", processes: store.topMemoryProcesses, color: Palette.purple) {
+                byteString($0.residentBytes)
+            }
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 18)
@@ -266,6 +279,48 @@ struct MonitorView: View {
         .padding(.leading, 20)
         .padding(.trailing, 12)
         .padding(.vertical, 10)
+    }
+
+    private func processList(
+        _ title: String,
+        processes: [ProcessUsage],
+        color: Color,
+        value: @escaping (ProcessUsage) -> String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(title)
+                .font(.system(size: 9, weight: .bold, design: .rounded))
+                .tracking(1.1)
+                .foregroundStyle(Palette.muted)
+                .padding(.bottom, 2)
+
+            if processes.isEmpty {
+                Text("Collecting process activity…")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Palette.muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                ForEach(processes, id: \.pid) { process in
+                    HStack(spacing: 8) {
+                        Circle().fill(color.opacity(0.75)).frame(width: 4, height: 4)
+                        Text(process.name)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .foregroundStyle(Palette.secondary)
+                        Spacer(minLength: 8)
+                        Text(value(process))
+                            .monospacedDigit()
+                            .foregroundStyle(Palette.primary)
+                    }
+                    .font(.system(size: 11, weight: .medium))
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("\(process.name), process \(process.pid), \(value(process))")
+                }
+            }
+        }
+        .padding(11)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Palette.track.opacity(0.65), in: RoundedRectangle(cornerRadius: 10))
     }
 
     private func graphAxis(top: String, bottom: String) -> some View {

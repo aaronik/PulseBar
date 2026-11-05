@@ -4,7 +4,7 @@ import SwiftUI
 
 @main
 @MainActor
-final class PulseBarApp: NSObject, NSApplicationDelegate {
+final class PulseBarApp: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private let store = MonitorStore()
     private let settings = DisplaySettings()
     private var statusItem: NSStatusItem?
@@ -30,6 +30,7 @@ final class PulseBarApp: NSObject, NSApplicationDelegate {
         button.setAccessibilityLabel("PulseBar system activity")
 
         popover.behavior = .transient
+        popover.delegate = self
         popover.animates = true
         popover.contentSize = NSSize(width: 360, height: 590)
         popover.contentViewController = NSHostingController(rootView: MonitorView(store: store, settings: settings))
@@ -63,8 +64,18 @@ final class PulseBarApp: NSObject, NSApplicationDelegate {
         if popover.isShown {
             popover.performClose(nil)
         } else {
+            let available = button.window?.screen?.visibleFrame.height ?? 800
+            popover.contentSize = NSSize(width: 360, height: min(920, max(400, available - 44)))
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         }
+    }
+
+    func popoverDidShow(_ notification: Notification) {
+        store.startProcessSampling()
+    }
+
+    func popoverDidClose(_ notification: Notification) {
+        store.stopProcessSampling()
     }
 
     private func renderStatus(_ history: [MetricSnapshot]) {

@@ -22,6 +22,15 @@ struct Smoke {
         try await Task.sleep(for: .seconds(1.2))
         precondition(store.history.count == count, "Timer continued after stop")
 
+        let sampler = ProcessSampler()
+        _ = await sampler.sample()
+        try await Task.sleep(for: .seconds(1.2))
+        let processes = await sampler.sample()
+        precondition(!processes.memory.isEmpty && processes.memory.count <= 5, "Missing memory rankings")
+        precondition(!processes.cpu.isEmpty && processes.cpu.count <= 5, "Missing CPU rankings")
+        precondition(zip(processes.cpu, processes.cpu.dropFirst()).allSatisfy { $0.cpu >= $1.cpu })
+        precondition(zip(processes.memory, processes.memory.dropFirst()).allSatisfy { $0.residentBytes >= $1.residentBytes })
+
         let suite = "PulseBar.Smoke.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
