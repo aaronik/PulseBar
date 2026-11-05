@@ -17,6 +17,14 @@ struct Smoke {
         precondition(sample.diskTotal > 0 && sample.diskUsed <= sample.diskTotal, "Invalid disk capacity")
         precondition(sample.download.isFinite && sample.download >= 0, "Invalid download")
         precondition(sample.upload.isFinite && sample.upload >= 0, "Invalid upload")
+        store.setRefreshInterval(4)
+        precondition(store.refreshInterval == 4, "Refresh rate did not change")
+        let slowCount = store.history.count
+        try await Task.sleep(for: .seconds(1.3))
+        precondition(store.history.count == slowCount, "Metrics refreshed before configured interval")
+        store.setRefreshInterval(1)
+        try await Task.sleep(for: .seconds(1.3))
+        precondition(store.history.count > slowCount, "Timer did not resume at faster interval")
         store.stop()
         let count = store.history.count
         try await Task.sleep(for: .seconds(1.2))
@@ -37,6 +45,8 @@ struct Smoke {
         let settings = DisplaySettings(defaults: defaults)
         precondition(settings.cpuPercent && settings.cpuGraph && settings.memoryGraph)
         precondition(!settings.networkUp && !settings.networkDown)
+        precondition(settings.refreshInterval == 1)
+        settings.refreshInterval = 5
         settings.cpuPercent = false
         settings.cpuGraph = false
         settings.memoryGraph = false
@@ -45,6 +55,9 @@ struct Smoke {
         let restored = DisplaySettings(defaults: defaults)
         precondition(!restored.cpuPercent && !restored.cpuGraph && !restored.memoryGraph)
         precondition(restored.networkUp && !restored.networkDown, "Preferences did not persist independently")
+        precondition(restored.refreshInterval == 5, "Refresh interval did not persist")
+        restored.refreshInterval = 100
+        precondition(restored.refreshInterval == 10, "Refresh interval was not clamped")
         restored.networkDown = true
         precondition(restored.networkUp && restored.networkDown)
         print("PASS: \(count) live samples, independent persistent toggles; CPU \(Int(sample.cpu * 100))%, RAM \(Int(sample.memory * 100))%")

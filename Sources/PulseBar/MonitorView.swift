@@ -33,6 +33,8 @@ struct MonitorView: View {
                     diskSection
                     separator
                     displaySection
+                    separator
+                    refreshSection
                 }
             }
             .scrollIndicators(.visible)
@@ -225,6 +227,35 @@ struct MonitorView: View {
                 Spacer(minLength: 0)
             }
             Text("Network lines share a scale set by the highest observed rate.")
+                .font(.system(size: 10))
+                .foregroundStyle(Palette.muted)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+    }
+
+    private var refreshSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                sectionLabel("REFRESH RATE", symbol: "timer", color: Palette.cyan)
+                Spacer()
+                Text("Every \(Int(settings.refreshInterval))s")
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(Palette.primary)
+            }
+            Slider(value: $settings.refreshInterval, in: 1...10, step: 1) {
+                Text("Refresh interval")
+            } minimumValueLabel: {
+                Text("1s")
+            } maximumValueLabel: {
+                Text("10s")
+            }
+            .tint(Palette.cyan)
+            .font(.system(size: 10, weight: .medium, design: .monospaced))
+            .foregroundStyle(Palette.muted)
+            .accessibilityLabel("Refresh interval")
+            .accessibilityValue("\(Int(settings.refreshInterval)) seconds")
+            Text("Slower updates use less CPU. Also adjusts process rankings.")
                 .font(.system(size: 10))
                 .foregroundStyle(Palette.muted)
         }

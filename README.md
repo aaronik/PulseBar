@@ -12,7 +12,8 @@ PulseBar keeps CPU and memory activity in view with two live sparklines. Click t
 - **Make it yours:** toggle the CPU percentage and each CPU, memory, download (lime), and upload (orange) graph line independently in the **MENU BAR** controls. Your choices persist across launches.
 - **A meaningful scale:** Unobstructed left-hand axes show 0–100% for CPU and memory. The network chart shows 0 B/s at the bottom and a live top rate based on the highest recent upload or download sample; hover for exact current readings.
 - **Click for detail:** CPU and memory history graphs with live Top 5 process lists, upload/download rates and history, and root-volume capacity. The panel scrolls so every section stays accessible.
-- **Lightweight and native:** one-second sampling, a 60-sample rolling history, an AppKit menu-bar item, and a SwiftUI popover.
+- **Adjustable refresh:** choose 1–10 seconds with the panel's refresh slider; the choice persists and changes both system and process sampling. Slower updates reduce CPU use.
+- **Lightweight and native:** a 60-sample rolling history, an AppKit menu-bar item, and a SwiftUI popover.
 - **Private by design:** metrics are collected locally. No account, analytics, network requests, or third-party packages.
 
 ## Requirements
@@ -56,7 +57,7 @@ The smoke test takes real samples and checks that metrics are bounded, network r
 | Network | Byte-counter deltas for active, non-loopback interfaces |
 | Storage | Root volume capacity and available space |
 
-Readings update every second; process rankings refresh every three seconds while the panel is open. Per-process CPU is the change in process CPU time as a percentage of one logical CPU, so multithreaded processes can exceed 100%. Per-process memory is resident size, not the sum used by all related processes. Some protected processes cannot be read and are omitted. Memory usage is an approximation, **not** Activity Monitor's memory-pressure score. Network traffic through virtual/tunnel interfaces can be counted more than once. Graph history lasts about a minute and resets on restart.
+Readings update at the selected 1–10 second interval; process rankings update at that same interval only while the panel is open. Per-process CPU is the change in process CPU time as a percentage of one logical CPU, so multithreaded processes can exceed 100%. Per-process memory is resident size, not the sum used by all related processes. Some protected processes cannot be read and are omitted. Memory usage is an approximation, **not** Activity Monitor's memory-pressure score. Network traffic through virtual/tunnel interfaces can be counted more than once. Graphs retain 60 samples (one to ten minutes, depending on the refresh setting) and reset on restart.
 
 ## License
 

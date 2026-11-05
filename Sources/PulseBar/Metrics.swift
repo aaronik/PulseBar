@@ -37,6 +37,7 @@ final class MonitorStore: ObservableObject {
     private var processTask: Task<Void, Never>?
     private var processGeneration = 0
     private var timer: Timer?
+    private(set) var refreshInterval: Double = 1
     private var previousCPU: [UInt64]?
     private var previousNetwork: [String: InterfaceCounters]?
     private var previousNetworkTime: Date?
@@ -46,12 +47,29 @@ final class MonitorStore: ObservableObject {
     func start() {
         guard timer == nil else { return }
         poll()
-        let timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+        scheduleTimer()
+    }
+
+    func setRefreshInterval(_ interval: Double) {
+        let adjusted = DisplaySettings.clampedInterval(interval)
+        guard adjusted != refreshInterval else { return }
+        refreshInterval = adjusted
+        if timer != nil { scheduleTimer() }
+        // Restart process sampling so the new cadence takes effect immediately.
+        if processTask != nil {
+            stopProcessSampling()
+            startProcessSampling()
+        }
+    }
+
+    private func scheduleTimer() {
+        timer?.invalidate()
+        let timer = Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.poll()
             }
         }
-        timer.tolerance = 0.1
+        timer.tolerance = min(0.5, refreshInterval * 0.1)
         self.timer = timer
     }
 
@@ -75,7 +93,7 @@ final class MonitorStore: ObservableObject {
                 guard !Task.isCancelled, generation == processGeneration else { break }
                 topCPUProcesses = result.cpu
                 topMemoryProcesses = result.memory
-                try? await Task.sleep(for: .seconds(3))
+                try? await Task.sleep(for: .seconds(refreshInterval))
             }
         }
     }

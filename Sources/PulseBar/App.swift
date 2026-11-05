@@ -49,6 +49,10 @@ final class PulseBarApp: NSObject, NSApplicationDelegate, NSPopoverDelegate {
                 self.renderStatus(self.store.history)
             }
         }.store(in: &subscriptions)
+        settings.$refreshInterval
+            .removeDuplicates()
+            .sink { [weak self] interval in self?.store.setRefreshInterval(interval) }
+            .store(in: &subscriptions)
         renderStatus([])
         store.start()
     }

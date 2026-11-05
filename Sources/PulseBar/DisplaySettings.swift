@@ -9,6 +9,7 @@ final class DisplaySettings: ObservableObject {
         static let cpuGraph = "display.cpuGraph"
         static let networkUp = "display.networkUp"
         static let networkDown = "display.networkDown"
+        static let refreshInterval = "display.refreshInterval"
     }
 
     @Published var cpuPercent: Bool { didSet { defaults.set(cpuPercent, forKey: Key.cpuPercent) } }
@@ -16,6 +17,18 @@ final class DisplaySettings: ObservableObject {
     @Published var cpuGraph: Bool { didSet { defaults.set(cpuGraph, forKey: Key.cpuGraph) } }
     @Published var networkUp: Bool { didSet { defaults.set(networkUp, forKey: Key.networkUp) } }
     @Published var networkDown: Bool { didSet { defaults.set(networkDown, forKey: Key.networkDown) } }
+    @Published var refreshInterval: Double {
+        didSet {
+            let value = Self.clampedInterval(refreshInterval)
+            if refreshInterval != value { refreshInterval = value; return }
+            defaults.set(value, forKey: Key.refreshInterval)
+        }
+    }
+
+    static func clampedInterval(_ value: Double) -> Double {
+        guard value.isFinite else { return 1 }
+        return min(10, max(1, value.rounded()))
+    }
 
     private let defaults: UserDefaults
 
@@ -27,6 +40,7 @@ final class DisplaySettings: ObservableObject {
         cpuGraph = defaults.object(forKey: Key.cpuGraph) as? Bool ?? true
         networkUp = defaults.object(forKey: Key.networkUp) as? Bool ?? false
         networkDown = defaults.object(forKey: Key.networkDown) as? Bool ?? false
+        refreshInterval = Self.clampedInterval(defaults.object(forKey: Key.refreshInterval) as? Double ?? 1)
     }
 
     var showsUsageGraph: Bool { cpuGraph || memoryGraph }
