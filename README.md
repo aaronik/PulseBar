@@ -2,7 +2,7 @@
 
 **A tiny, beautiful system monitor for your macOS menu bar.**
 
-PulseBar keeps CPU and memory activity in view with two live sparklines. Click the graph to open a dark, compact dashboard with CPU history, memory, network traffic, and storage usage. It is built with AppKit and SwiftUI, has no external dependencies, and runs without a Dock icon.
+PulseBar keeps CPU and memory activity in view with two live sparklines. Click the graph to open a dark, compact dashboard with CPU history, memory, network traffic, and storage usage. It is built with AppKit and SwiftUI, has no external dependencies, and runs without a Dock icon. Its waveform app icon also appears in Spotlight.
 
 ![PulseBar live resource dashboard](docs/dashboard.png)
 
@@ -47,6 +47,8 @@ swiftc -swift-version 6 -target "$(uname -m)-apple-macosx13.0" \
 ```
 
 The smoke test takes real samples and checks that metrics are bounded, network rates are nonnegative, and the sampler starts/stops correctly. Full Xcode is needed for XCTest; the standalone smoke test works with Command Line Tools alone.
+
+The bundled `Resources/PulseBar.icns` is generated from `scripts/GenerateIcon.swift`. To regenerate it, run `swift scripts/GenerateIcon.swift Resources/PulseBar.iconset && iconutil -c icns Resources/PulseBar.iconset -o Resources/PulseBar.icns`.
 
 ## How it works
 
