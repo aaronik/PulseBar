@@ -29,6 +29,10 @@ struct MonitorView: View {
                     memorySection
                     separator
                     networkSection
+                    if snapshot.battery != nil {
+                        separator
+                        batterySection
+                    }
                     separator
                     diskSection
                     separator
@@ -181,6 +185,47 @@ struct MonitorView: View {
                 .accessibilityLabel("Network history, zero to \(byteString(networkCeiling)) per second")
             }
             .frame(height: 62)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 18)
+    }
+
+    private var batterySection: some View {
+        let battery = snapshot.battery
+        let batteryColor = Palette.battery
+        return VStack(alignment: .leading, spacing: 13) {
+            HStack {
+                sectionLabel("BATTERY", symbol: "battery.100percent", color: batteryColor)
+                Spacer()
+                Text(percent(battery?.level ?? 0))
+                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(Palette.primary)
+            }
+            HStack(spacing: 8) {
+                graphAxis(top: "100%", bottom: "0%")
+                MonitorGraph(
+                    series: [graphHistory.compactMap { $0.battery?.level }],
+                    colors: [batteryColor],
+                    ceiling: 1,
+                    fillFirst: true
+                )
+                .accessibilityLabel("Battery charge history, zero to one hundred percent")
+            }
+            .frame(height: 62)
+            HStack(spacing: 6) {
+                Image(systemName: battery?.isCharging == true ? "bolt.fill" :
+                      battery?.isPluggedIn == true ? "powerplug.fill" : "battery.100percent")
+                    .foregroundStyle(batteryColor)
+                Text(battery?.isCharging == true ? "Charging" :
+                     battery?.isPluggedIn == true ? "On power adapter" : "On battery")
+                    .foregroundStyle(Palette.secondary)
+                Spacer()
+                Text("RECENT ACTIVITY")
+                    .tracking(1)
+                    .foregroundStyle(Palette.muted)
+            }
+            .font(.system(size: 10, weight: .medium, design: .rounded))
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 18)
@@ -453,6 +498,7 @@ private enum Palette {
     static let lime = Color(red: 0.81, green: 0.91, blue: 0.23)
     static let purple = Color(red: 0.69, green: 0.57, blue: 0.98)
     static let orange = Color(red: 1.0, green: 0.68, blue: 0.39)
+    static let battery = Color(red: 1.0, green: 0.79, blue: 0.34)
 }
 
 private struct MonitorGraph: View {

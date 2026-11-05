@@ -17,6 +17,14 @@ struct Smoke {
         precondition(sample.diskTotal > 0 && sample.diskUsed <= sample.diskTotal, "Invalid disk capacity")
         precondition(sample.download.isFinite && sample.download >= 0, "Invalid download")
         precondition(sample.upload.isFinite && sample.upload >= 0, "Invalid upload")
+        if let battery = BatterySampler.read() {
+            precondition((0...1).contains(battery.level), "Invalid battery percentage")
+            precondition(sample.battery != nil, "Battery missing from metric history")
+            precondition(abs((sample.battery?.level ?? 0) - battery.level) <= 0.05,
+                         "Battery history differs from power source")
+        } else {
+            precondition(sample.battery == nil, "No-battery machine should omit battery reading")
+        }
         store.setRefreshInterval(4)
         precondition(store.refreshInterval == 4, "Refresh rate did not change")
         let slowCount = store.history.count

@@ -12,6 +12,7 @@ struct MetricSnapshot: Sendable {
     var upload: Double
     var diskUsed: UInt64
     var diskTotal: UInt64
+    var battery: BatteryReading?
 
     static let zero = MetricSnapshot(
         timestamp: .distantPast,
@@ -22,7 +23,8 @@ struct MetricSnapshot: Sendable {
         download: 0,
         upload: 0,
         diskUsed: 0,
-        diskTotal: 0
+        diskTotal: 0,
+        battery: nil
     )
 }
 
@@ -110,6 +112,7 @@ final class MonitorStore: ObservableObject {
         let (usedMemory, totalMemory) = memoryUsage() ?? (snapshot.usedMemory, snapshot.totalMemory)
         let (download, upload) = networkRates(at: now)
         let (diskUsed, diskTotal) = diskUsage() ?? (snapshot.diskUsed, snapshot.diskTotal)
+        let battery = BatterySampler.read()
 
         let current = MetricSnapshot(
             timestamp: now,
@@ -120,7 +123,8 @@ final class MonitorStore: ObservableObject {
             download: download,
             upload: upload,
             diskUsed: diskUsed,
-            diskTotal: diskTotal
+            diskTotal: diskTotal,
+            battery: battery
         )
         snapshot = current
         history.append(current)
