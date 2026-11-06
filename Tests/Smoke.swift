@@ -84,6 +84,22 @@ struct Smoke {
         let expired = BatteryHistory(url: historyURL, now: base.addingTimeInterval(BatteryHistory.window + 302))
         precondition(expired.points.isEmpty, "Old battery readings were not pruned")
 
+        func networkPoint(down: Double, up: Double) -> MetricSnapshot {
+            var point = MetricSnapshot.zero
+            point.download = down
+            point.upload = up
+            return point
+        }
+        precondition(StatusNetworkScale.bytesPerSecond(for: []) == 4_096)
+        precondition(StatusNetworkScale.bytesPerSecond(for: [networkPoint(down: 10, up: 20)]) == 4_096)
+        let spike = networkPoint(down: 1_000_000, up: 0)
+        let normal = networkPoint(down: 20_000, up: 8_000)
+        precondition(StatusNetworkScale.bytesPerSecond(for: [spike, normal]) == 1_150_000)
+        precondition(StatusNetworkScale.bytesPerSecond(for: [spike] + Array(repeating: normal, count: 30)) == 23_000,
+                     "Old network spike still flattens visible graph")
+        precondition(abs(StatusNetworkScale.bytesPerSecond(for: [networkPoint(down: 0, up: 50_000)]) - 57_500) < 0.01,
+                     "Upload and download should share the same scale")
+
         let sampler = ProcessSampler()
         _ = await sampler.sample()
         try await Task.sleep(for: .seconds(1.2))

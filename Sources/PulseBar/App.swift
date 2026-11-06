@@ -10,7 +10,6 @@ final class PulseBarApp: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var statusItem: NSStatusItem?
     private let popover = NSPopover()
     private var subscriptions = Set<AnyCancellable>()
-    private var peakNetworkRate: Double = 0
 
     static func main() {
         let app = NSApplication.shared
@@ -37,9 +36,6 @@ final class PulseBarApp: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
         store.$history.dropFirst().sink { [weak self] history in
             guard let self else { return }
-            if let last = history.last {
-                self.peakNetworkRate = max(self.peakNetworkRate, last.upload, last.download)
-            }
             self.renderStatus(history)
         }.store(in: &subscriptions)
         settings.objectWillChange.sink { [weak self] _ in
@@ -93,7 +89,7 @@ final class PulseBarApp: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         let width: CGFloat = (hasGraph ? 58 : 18) + (settings.cpuPercent ? 37 : 0)
         item.length = width
         button.imagePosition = .imageOnly
-        button.image = StatusGraph.image(history: history, settings: settings, peakNetworkRate: peakNetworkRate)
+        button.image = StatusGraph.image(history: history, settings: settings)
         button.toolTip = "CPU \(Int((cpu * 100).rounded()))% · Memory \(Int((memory * 100).rounded()))% · ↓ \(Int(download)) B/s · ↑ \(Int(upload)) B/s"
         button.setAccessibilityValue("CPU \(Int((cpu * 100).rounded())) percent, memory \(Int((memory * 100).rounded())) percent, download \(Int(download)) bytes per second, upload \(Int(upload)) bytes per second")
     }
@@ -101,8 +97,8 @@ final class PulseBarApp: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
 @MainActor
 private enum StatusGraph {
-    static func image(history: [MetricSnapshot], settings: DisplaySettings, peakNetworkRate: Double) -> NSImage {
-        let samples = Array(history.suffix(30))
+    static func image(history: [MetricSnapshot], settings: DisplaySettings) -> NSImage {
+        let samples = Array(history.suffix(StatusNetworkScale.sampleCount))
         let hasGraph = settings.showsUsageGraph || settings.showsNetworkGraph
         let size = NSSize(width: (hasGraph ? 54 : 14) + (settings.cpuPercent ? 37 : 0), height: 20)
         let label = Int(((samples.last?.cpu ?? 0) * 100).rounded())
@@ -111,7 +107,7 @@ private enum StatusGraph {
         let upEnabled = settings.networkUp
         let downEnabled = settings.networkDown
         let percentEnabled = settings.cpuPercent
-        let networkScale = max(peakNetworkRate, 1)
+        let networkScale = StatusNetworkScale.bytesPerSecond(for: samples)
         return NSImage(size: size, flipped: false) { _ in
             if hasGraph {
                 let graph = CGRect(x: 1, y: 3, width: 53, height: 14)
@@ -168,7 +164,7 @@ private enum StatusGraph {
         path.lineJoinStyle = .round
         for (index, value) in values.enumerated() {
             // Right-align the timeline so the graph grows leftward during startup.
-            let x = rect.minX + rect.width * CGFloat(30 - values.count + index) / 29
+            let x = rect.minX + rect.width * CGFloat(StatusNetworkScale.sampleCount - values.count + index) / CGFloat(StatusNetworkScale.sampleCount - 1)
             let y = rect.minY + rect.height * CGFloat(min(1, max(0, value)))
             if index == 0 { path.move(to: CGPoint(x: x, y: y)) }
             else { path.line(to: CGPoint(x: x, y: y)) }

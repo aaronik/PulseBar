@@ -357,7 +357,7 @@ struct MonitorView: View {
                 displayToggle("Network ↓", isOn: $settings.networkDown, color: Palette.lime)
                 Spacer(minLength: 0)
             }
-            Text("Network lines share a scale set by the highest observed rate.")
+            Text("Network lines share a scale based on the latest 30 samples.")
                 .font(.system(size: 10))
                 .foregroundStyle(Palette.muted)
         }
